@@ -280,23 +280,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <!-- COVER SCREEN: SATU KESATUAN UTUH -->
         <div id="cover-screen" class="fixed inset-0 z-50 flex flex-col bg-[#180809] mobile-container w-full h-[100dvh] overflow-hidden">
-            <!-- JUDUL COVER: TERPISAH DARI FOTO, TIDAK MENUTUPI GAMBAR -->
+
+            <!-- JUDUL -->
             <div class="shrink-0 h-[19%] flex flex-col items-center justify-center text-center px-4 relative z-20">
                 <p class="font-serif tracking-[0.35em] text-[10px] sm:text-xs text-wedding-gold uppercase">THE WEDDING OF</p>
                 <h1 class="font-script text-5xl sm:text-6xl mt-2 text-wedding-gold gold-text-glow">Nia & Pebri</h1>
             </div>
 
-            <!-- FOTO COVER: SATU BLOK UTUH, TANPA TULISAN DI ATAS FOTO -->
+            <!-- FOTO COVER: UTUH, TIDAK DITUTUPI TEKS -->
             <div class="flex-1 min-h-0 w-full flex items-center justify-center px-3 relative z-10">
                 <img src="foto_01_cover.jpg" alt="Nia dan Pebri" class="block max-w-full max-h-full w-auto h-auto object-contain">
             </div>
 
-            <!-- NAMA TAMU + TOMBOL: DI BAWAH FOTO, TIDAK MENUTUPI GAMBAR -->
-            <div class="shrink-0 h-[19%] flex flex-col items-center justify-center text-center px-4 relative z-20">
-                <p class="text-[10px] text-wedding-gold/90 mb-2 font-serif">Kepada Yth. Bapak/Ibu/Saudara/i:</p>
-                <div class="bg-[#180809] px-6 py-2 rounded-xl border border-wedding-gold/50 max-w-[280px] mx-auto shadow-xl">
+            <!-- AREA TAMU: TERPISAH DARI FOTO AGAR TIDAK TERHALANG BINGKAI -->
+            <div class="shrink-0 h-[24%] flex flex-col items-center justify-start text-center px-4 pt-3 relative z-30 bg-[#180809]">
+                <p class="text-[10px] text-wedding-gold/90 mb-2 font-serif leading-relaxed">
+                    Kepada Yth.<br>Bapak/Ibu/Saudara/i
+                </p>
+
+                <div class="bg-[#180809] px-6 py-2 rounded-xl border border-wedding-gold/50 max-w-[280px] w-full mx-auto shadow-xl">
                     <p id="guest-name-cover" class="font-serif text-xs font-semibold text-wedding-gold tracking-wide truncate">Tamu Undangan</p>
                 </div>
+
                 <button onclick="openInvitation()" class="mt-3 px-8 py-3 rounded-full border border-wedding-gold/80 text-wedding-gold bg-[#2b1011] font-serif tracking-widest text-[11px] font-semibold flex items-center gap-2.5 mx-auto hover:bg-wedding-gold hover:text-wedding-dark transition-all shadow-xl active:scale-95">
                     Buka Undangan <i class="fa-solid fa-chevron-down text-[10px]"></i>
                 </button>
@@ -757,22 +762,15 @@ document.addEventListener('DOMContentLoaded', function () {
         <span id="toast-msg">Teks berhasil disalin!</span>
     </div>
 
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
-        let currentRSVPStatus = 'Hadir';
-
-        // ==========================================
-        // SUPABASE CONFIGURATION
-        // ==========================================
         const SUPABASE_URL = 'https://yhukbnunhktywrpbetbl.supabase.co';
-
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlodWtibnVuaGt0eXdycGJldGJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4Nzk0OTQsImV4cCI6MjEwNTQ1NTQ5NH0.8Vi-ZxY-9TKTSGiMf88JsSAMl86SG1fY9e8u1ubhGM4';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const supabaseClient = window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY
-        );
+        let currentRSVPStatus = 'Hadir';
 
         function handleImgError(img, title, subtitle = '') {
             img.onerror = null;
@@ -905,16 +903,46 @@ document.addEventListener('DOMContentLoaded', function () {
             currentRSVPStatus = status;
         }
 
-        function handleRSVP(e) {
+        async function handleRSVP(e) {
             e.preventDefault();
-            const name = document.getElementById('rsvp-name').value;
-            showToast(`Terima kasih ${name}, konfirmasi [${currentRSVPStatus}] tercatat!`);
-            document.getElementById('rsvp-form').reset();
+
+            const nameInput = document.getElementById('rsvp-name');
+            const countInput = document.getElementById('rsvp-count');
+
+            const name = nameInput ? nameInput.value.trim() : '';
+            const guestCount = countInput ? countInput.value : '1 Orang';
+
+            if (!name) {
+                showToast('Nama wajib diisi.');
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('rsvps')
+                    .insert([{
+                        name: name,
+                        status: currentRSVPStatus,
+                        guest_count: guestCount
+                    }]);
+
+                if (error) {
+                    console.error('Gagal menyimpan RSVP:', error);
+                    showToast('RSVP gagal disimpan.');
+                    return;
+                }
+
+                showToast(`Terima kasih ${name}, RSVP [${currentRSVPStatus}] berhasil disimpan!`);
+                document.getElementById('rsvp-form').reset();
+                currentRSVPStatus = 'Hadir';
+            } catch (error) {
+                console.error('Error RSVP:', error);
+                showToast('Terjadi kesalahan. Silakan coba lagi.');
+            }
         }
 
         async function loadWishes() {
             const container = document.getElementById('wishes-list');
-
             if (!container) return;
 
             container.innerHTML = `
@@ -931,21 +959,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (error) {
                     console.error('Gagal mengambil ucapan:', error);
-
                     container.innerHTML = `
                         <div class="text-center py-4 text-wedding-text opacity-60 text-[11px]">
                             Belum ada ucapan.
                         </div>
                     `;
-
                     return;
                 }
 
                 renderWishes(data || []);
-
             } catch (error) {
                 console.error('Error loadWishes:', error);
-
                 container.innerHTML = `
                     <div class="text-center py-4 text-wedding-text opacity-60 text-[11px]">
                         Gagal memuat ucapan.
@@ -956,45 +980,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function renderWishes(wishes) {
             const container = document.getElementById('wishes-list');
-
             if (!container) return;
 
-            if (!wishes || wishes.length === 0) {
+            if (!wishes.length) {
                 container.innerHTML = `
-                    <div class="text-center py-6 text-wedding-text opacity-60 text-[11px]">
-                        Belum ada ucapan.
-                        <br>
-                        Jadilah yang pertama memberikan ucapan & doa.
+                    <div class="text-center py-4 text-wedding-text opacity-60 text-[11px]">
+                        Belum ada ucapan. Jadilah yang pertama memberikan doa.
                     </div>
                 `;
                 return;
             }
 
             container.innerHTML = wishes.map(w => {
-
                 const date = w.created_at
-                    ? new Date(w.created_at).toLocaleDateString('id-ID', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    })
-                    : 'Hari Ini';
+                    ? new Date(w.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : '';
 
                 return `
                     <div class="bg-[#2b1011] p-3.5 rounded-xl border border-wedding-gold/30">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="font-serif text-xs font-bold text-wedding-gold">
-                                ${escapeHtml(w.name || '')}
-                            </span>
-
-                            <span class="text-[9px] text-wedding-text opacity-60">
-                                ${escapeHtml(date)}
-                            </span>
+                        <div class="flex justify-between items-center mb-1 gap-2">
+                            <span class="font-serif text-xs font-bold text-wedding-gold">${escapeHtml(w.name || '')}</span>
+                            <span class="text-[9px] text-wedding-text opacity-60 shrink-0">${date}</span>
                         </div>
-
-                        <p class="text-[11px] text-wedding-text opacity-90 leading-relaxed">
-                            ${escapeHtml(w.message || '')}
-                        </p>
+                        <p class="text-[11px] text-wedding-text opacity-90 leading-relaxed">${escapeHtml(w.message || '')}</p>
                     </div>
                 `;
             }).join('');
@@ -1006,63 +1014,29 @@ document.addEventListener('DOMContentLoaded', function () {
             const nameInput = document.getElementById('wish-name');
             const msgInput = document.getElementById('wish-message');
 
-            if (!nameInput || !msgInput) return;
-
             const name = nameInput.value.trim();
             const message = msgInput.value.trim();
 
-            if (!name || !message) {
-                showToast('Nama dan ucapan wajib diisi.');
-                return;
-            }
-
-            const submitButton = document.querySelector(
-                '#wish-form button[type="submit"]'
-            );
-
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.innerHTML = `
-                    <i class="fa-solid fa-spinner fa-spin mr-2"></i>
-                    Mengirim...
-                `;
-            }
+            if (!name || !message) return;
 
             try {
                 const { error } = await supabaseClient
                     .from('wishes')
-                    .insert([
-                        {
-                            name: name,
-                            message: message
-                        }
-                    ]);
+                    .insert([{ name: name, message: message }]);
 
                 if (error) {
                     console.error('Gagal menyimpan ucapan:', error);
-                    showToast('Ucapan gagal dikirim. Silakan coba lagi.');
+                    showToast('Ucapan gagal dikirim.');
                     return;
                 }
 
                 nameInput.value = '';
                 msgInput.value = '';
-
                 await loadWishes();
-
                 showToast('Ucapan & Doa Anda telah terkirim!');
-
             } catch (error) {
                 console.error('Error addWish:', error);
                 showToast('Terjadi kesalahan. Silakan coba lagi.');
-
-            } finally {
-                if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = `
-                        <i class="fa-solid fa-paper-plane mr-2"></i>
-                        Kirim Ucapan
-                    `;
-                }
             }
         }
 
